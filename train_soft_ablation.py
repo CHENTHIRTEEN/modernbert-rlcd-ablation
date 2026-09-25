@@ -342,6 +342,8 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=0, help=">0 时只训这么多步（smoke）")
     ap.add_argument("--eval-max-records", type=int, default=0, help=">0 时评测只取前 N 条 test record（smoke）")
+    ap.add_argument("--eval-only", action="store_true",
+                    help="跳过训练，从 runs/<mode>_tau1.0/model.pt 加载权重直接评测（要求此前用 --save-model 训过）")
     ap.add_argument("--stats-only", action="store_true")
     ap.add_argument("--save-model", action="store_true")
     args = ap.parse_args()
@@ -369,9 +371,14 @@ def main():
         _TOK.pad_token = _TOK.eos_token
 
     print(f"building pairs (mode={args.target_mode}) ...")
-    train_items = build_pairs(train_recs, args, args.target_mode, "train")
-    calib_items = build_pairs(calib_recs, args, args.target_mode, "calib")
-    test_items = build_pairs(test_recs, args, args.target_mode, "test")
+    if args.eval_only:
+        train_items = []
+        calib_items = build_pairs(calib_recs, args, args.target_mode, "calib")
+        test_items = build_pairs(test_recs, args, args.target_mode, "test")
+    else:
+        train_items = build_pairs(train_recs, args, args.target_mode, "train")
+        calib_items = build_pairs(calib_recs, args, args.target_mode, "calib")
+        test_items = build_pairs(test_recs, args, args.target_mode, "test")
 
     # ---- 目标分布诊断 ----
     y_all = np.array([it["y"] for it in train_items + test_items])
@@ -392,62 +399,69 @@ def main():
     # MPS：fp32 + 小批次控显存；bf16 autocast 对 ModernBERT 会 NaN；grad ckpt 会挂起，均默认关
     if args.grad_ckpt:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-    use_amp = args.amp and probe_amp(model, device)
-    print(f"bf16 autocast: {use_amp} | grad ckpt: {args.grad_ckpt}", flush=True)
+    use_amp = False
+    if args.eval_only:
+        ckpt_path = out_dir / "model.pt"
+        model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True)["state_dict"])
+        train_minutes, step = 0.0, 0
+        print(f"eval-only: loaded {ckpt_path}", flush=True)
+    else:
+        use_amp = args.amp and probe_amp(model, device)
+        print(f"bf16 autocast: {use_amp} | grad ckpt: {args.grad_ckpt}", flush=True)
 
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    rng = np.random.default_rng(args.seed)
-    ep_batches = make_batches(train_items, args.max_tokens, rng)
-    steps_per_epoch = len(ep_batches)
-    total_steps = args.epochs * steps_per_epoch if not args.max_steps else args.max_steps
-    warmup = max(1, int(args.warmup_frac * total_steps))
-    def lr_lambda(step):
-        if step < warmup:
-            return step / warmup
-        prog = (step - warmup) / max(1, total_steps - warmup)
-        return 0.5 * (1 + math.cos(math.pi * min(1.0, prog)))
-    sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
-    print(f"steps/epoch={steps_per_epoch} total={total_steps} warmup={warmup}", flush=True)
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        rng = np.random.default_rng(args.seed)
+        ep_batches = make_batches(train_items, args.max_tokens, rng)
+        steps_per_epoch = len(ep_batches)
+        total_steps = args.epochs * steps_per_epoch if not args.max_steps else args.max_steps
+        warmup = max(1, int(args.warmup_frac * total_steps))
+        def lr_lambda(step):
+            if step < warmup:
+                return step / warmup
+            prog = (step - warmup) / max(1, total_steps - warmup)
+            return 0.5 * (1 + math.cos(math.pi * min(1.0, prog)))
+        sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
+        print(f"steps/epoch={steps_per_epoch} total={total_steps} warmup={warmup}", flush=True)
 
-    pad_id = _TOK.pad_token_id
-    step, t0, run_loss, run_n = 0, time.time(), 0.0, 0
-    done = False
-    for ep in range(args.epochs):
-        batches = ep_batches if ep == 0 else make_batches(train_items, args.max_tokens, rng)
-        for idxs in batches:
-            ids, att, y = collate(train_items, idxs, pad_id, device)
-            with torch.autocast(device.type, dtype=torch.bfloat16, enabled=use_amp):
-                logits = model(input_ids=ids, attention_mask=att).logits
-            logits = logits.float()
-            logp = F.log_softmax(logits, -1)
-            t = torch.stack([1 - y, y], -1)
-            loss = -(t * logp).sum(-1).mean()
-            if not math.isfinite(loss.item()):
-                if device.type == "mps":
+        pad_id = _TOK.pad_token_id
+        step, t0, run_loss, run_n = 0, time.time(), 0.0, 0
+        done = False
+        for ep in range(args.epochs):
+            batches = ep_batches if ep == 0 else make_batches(train_items, args.max_tokens, rng)
+            for idxs in batches:
+                ids, att, y = collate(train_items, idxs, pad_id, device)
+                with torch.autocast(device.type, dtype=torch.bfloat16, enabled=use_amp):
+                    logits = model(input_ids=ids, attention_mask=att).logits
+                logits = logits.float()
+                logp = F.log_softmax(logits, -1)
+                t = torch.stack([1 - y, y], -1)
+                loss = -(t * logp).sum(-1).mean()
+                if not math.isfinite(loss.item()):
+                    if device.type == "mps":
+                        torch.mps.empty_cache()
+                    elif device.type == "cuda":
+                        torch.cuda.empty_cache()
+                    raise RuntimeError(f"loss {loss.item()} at step {step}; aborting before wasting GPU-hours")
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step(); sched.step(); opt.zero_grad(set_to_none=True)
+                if step % 50 == 0 and device.type == "mps":
                     torch.mps.empty_cache()
-                elif device.type == "cuda":
-                    torch.cuda.empty_cache()
-                raise RuntimeError(f"loss {loss.item()} at step {step}; aborting before wasting GPU-hours")
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step(); sched.step(); opt.zero_grad(set_to_none=True)
-            if step % 50 == 0 and device.type == "mps":
-                torch.mps.empty_cache()
-            run_loss += loss.item() * len(idxs); run_n += len(idxs)
-            step += 1
-            if step % 50 == 0:
-                with torch.no_grad():
-                    p̄ = torch.softmax(logits, -1)[:, 1].mean().item()
-                print(f"  step {step:5d}/{total_steps} ep{ep + 1} loss={run_loss / run_n:.4f} "
-                      f"p̄={p̄:.3f} bs={len(idxs)} lr={sched.get_last_lr()[0]:.2e} "
-                      f"{step / (time.time() - t0):.2f} it/s", flush=True)
-                run_loss, run_n = 0.0, 0
-            if args.max_steps and step >= args.max_steps:
-                done = True; break
-        if done:
-            break
-    train_minutes = (time.time() - t0) / 60
-    print(f"training done in {train_minutes:.1f} min")
+                run_loss += loss.item() * len(idxs); run_n += len(idxs)
+                step += 1
+                if step % 50 == 0:
+                    with torch.no_grad():
+                        p̄ = torch.softmax(logits, -1)[:, 1].mean().item()
+                    print(f"  step {step:5d}/{total_steps} ep{ep + 1} loss={run_loss / run_n:.4f} "
+                          f"p̄={p̄:.3f} bs={len(idxs)} lr={sched.get_last_lr()[0]:.2e} "
+                          f"{step / (time.time() - t0):.2f} it/s", flush=True)
+                    run_loss, run_n = 0.0, 0
+                if args.max_steps and step >= args.max_steps:
+                    done = True; break
+            if done:
+                break
+        train_minutes = (time.time() - t0) / 60
+        print(f"training done in {train_minutes:.1f} min")
 
     # ---- 校准温度（calib 不曾进训练）----
     # 推理无激活存储，批次可以放大很多
@@ -475,10 +489,14 @@ def main():
         "per_func": {},
         "strata": strata(p_test, test_used),
     }
-    for fn in FUNCS:
-        m = [i for i, it in enumerate(test_used) if it["func"] == fn]
-        if m:
-            res["per_func"][fn] = evaluate(p_test[np.array(m)], [test_used[i] for i in m], T_use)
+    res["per_func"] = {}
+    for key in sorted({f"{it['func']}_D{it['dim']}" for it in test_used}):
+        m = [i for i, it in enumerate(test_used) if f"{it['func']}_D{it['dim']}" == key]
+        res["per_func"][key] = evaluate(p_test[np.array(m)], [test_used[i] for i in m], T_use)
+    res["per_dim"] = {}
+    for d in sorted({it["dim"] for it in test_used}):
+        m = [i for i, it in enumerate(test_used) if it["dim"] == d]
+        res["per_dim"][f"D{d}"] = evaluate(p_test[np.array(m)], [test_used[i] for i in m], T_use)
 
     (out_dir / "metrics.json").write_text(json.dumps(res, indent=2, ensure_ascii=False))
     if args.save_model:
