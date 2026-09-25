@@ -400,6 +400,7 @@ def main():
     if args.grad_ckpt:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     use_amp = False
+    pad_id = _TOK.pad_token_id
     if args.eval_only:
         ckpt_path = out_dir / "model.pt"
         model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True)["state_dict"])
@@ -423,7 +424,6 @@ def main():
         sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
         print(f"steps/epoch={steps_per_epoch} total={total_steps} warmup={warmup}", flush=True)
 
-        pad_id = _TOK.pad_token_id
         step, t0, run_loss, run_n = 0, time.time(), 0.0, 0
         done = False
         for ep in range(args.epochs):
