@@ -1,0 +1,105 @@
+device=cuda | train=6 calib=2 test=8 records (train dims=[5], test dims=[5, 10])
+building pairs (mode=raw) ...
+  [train] IOH_Ellipsoid_D5_r1: 900 pairs
+  [train] IOH_Rastrigin_D5_r1: 900 pairs
+  [train] IOH_Rastrigin_D5_r2: 900 pairs
+  [train] IOH_Rosenbrock_D5_r1: 900 pairs
+  [train] IOH_Rosenbrock_D5_r2: 900 pairs
+  [train] IOH_Sphere_D5_r1: 900 pairs
+  [calib] IOH_Ellipsoid_D5_r2: 200 pairs
+  [calib] IOH_Sphere_D5_r2: 200 pairs
+  [test] IOH_Ellipsoid_D10_r3: 900 pairs
+  [test] IOH_Ellipsoid_D5_r3: 900 pairs
+  [test] IOH_Rastrigin_D10_r3: 900 pairs
+  [test] IOH_Rastrigin_D5_r3: 900 pairs
+  [test] IOH_Rosenbrock_D10_r3: 900 pairs
+  [test] IOH_Rosenbrock_D5_r3: 900 pairs
+  [test] IOH_Sphere_D10_r3: 900 pairs
+  [test] IOH_Sphere_D5_r3: 900 pairs
+target diag: {
+  "y_quantiles": {
+    "0.05": 0.03630096903825851,
+    "0.25": 0.25672681034136097,
+    "0.5": 0.4997987570182527,
+    "0.75": 0.7356052454597037,
+    "0.95": 0.9940643494453095
+  },
+  "frac_near_tie_[.45,.55]": 0.12793650793650793,
+  "frac_decisive_>_.95_or_<_.05": 0.15492063492063493,
+  "mean_abs_delta": 1.974284869390563
+}
+Loading weights:   0%|          | 0/136 [00:00<?, ?it/s]Loading weights: 100%|██████████| 136/136 [00:00<00:00, 6595.43it/s]
+[transformers] [1mModernBertForSequenceClassification LOAD REPORT[0m from: answerdotai/ModernBERT-base
+Key               | Status     | 
+------------------+------------+-
+decoder.bias      | UNEXPECTED | 
+classifier.bias   | MISSING    | 
+classifier.weight | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+bf16 autocast: True | grad ckpt: False
+steps/epoch=150 total=450 warmup=22
+  step    50/450 ep1 loss=0.7093 p̄=0.612 bs=37 lr=1.98e-05 4.26 it/s
+  step   100/450 ep1 loss=0.6444 p̄=0.562 bs=37 lr=1.84e-05 4.35 it/s
+  step   150/450 ep1 loss=0.6372 p̄=0.504 bs=36 lr=1.59e-05 4.35 it/s
+  step   200/450 ep2 loss=0.6141 p̄=0.603 bs=36 lr=1.26e-05 4.36 it/s
+  step   250/450 ep2 loss=0.6126 p̄=0.405 bs=36 lr=8.97e-06 4.37 it/s
+  step   300/450 ep2 loss=0.6140 p̄=0.503 bs=36 lr=5.47e-06 4.37 it/s
+  step   350/450 ep3 loss=0.5916 p̄=0.574 bs=37 lr=2.58e-06 4.37 it/s
+  step   400/450 ep3 loss=0.5794 p̄=0.462 bs=36 lr=6.66e-07 4.37 it/s
+  step   450/450 ep3 loss=0.5652 p̄=0.460 bs=36 lr=0.00e+00 4.37 it/s
+training done in 1.7 min
+fitted temperature T=1.344 (runtime clamp -> 1.344)
+{
+  "n": 7200,
+  "acc": 0.7263888888888889,
+  "nll_hard": 0.5686245259994185,
+  "brier_hard": 0.19164474908978707,
+  "ece": 0.08050459003179437,
+  "l1_target": 0.1943562516420501,
+  "nll_target": 0.6297060992260074,
+  "target_entropy": 0.48286210266116464,
+  "spearman_conf_strength": 0.22814671006584447,
+  "acc_T": 0.7263888888888889,
+  "nll_hard_T": 0.5877437280444007,
+  "ece_T": 0.11389908055072001,
+  "l1_target_T": 0.20064191363918624
+}
+per-function acc: {'IOH_Ellipsoid_D10': 0.7422, 'IOH_Ellipsoid_D5': 0.7211, 'IOH_Rastrigin_D10': 0.7133, 'IOH_Rastrigin_D5': 0.68, 'IOH_Rosenbrock_D10': 0.6978, 'IOH_Rosenbrock_D5': 0.7933, 'IOH_Sphere_D10': 0.7456, 'IOH_Sphere_D5': 0.7178}
+strata: [
+  {
+    "bucket": "Q1",
+    "n": 1800,
+    "acc": 0.5522222222222222,
+    "mean_y": 0.5036908258730357,
+    "mean_conf": 0.6300133851501677,
+    "mean_abs_p05": 0.13001338515016767
+  },
+  {
+    "bucket": "Q2",
+    "n": 1800,
+    "acc": 0.6827777777777778,
+    "mean_y": 0.5144983420320371,
+    "mean_conf": 0.6309800110177861,
+    "mean_abs_p05": 0.13098001101778614
+  },
+  {
+    "bucket": "Q3",
+    "n": 1800,
+    "acc": 0.7594444444444445,
+    "mean_y": 0.49342512015882384,
+    "mean_conf": 0.6402036004927423,
+    "mean_abs_p05": 0.14020360049274233
+  },
+  {
+    "bucket": "Q4",
+    "n": 1800,
+    "acc": 0.9111111111111111,
+    "mean_y": 0.46828341129702156,
+    "mean_conf": 0.6823401987676819,
+    "mean_abs_p05": 0.18234019876768193
+  }
+]
+saved -> runs/p1/raw_tau1.0/metrics.json

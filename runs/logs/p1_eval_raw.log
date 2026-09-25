@@ -1,0 +1,88 @@
+device=cuda | train=6 calib=2 test=8 records (train dims=[5], test dims=[5, 10])
+building pairs (mode=raw) ...
+  [calib] IOH_Ellipsoid_D5_r2: 200 pairs
+  [calib] IOH_Sphere_D5_r2: 200 pairs
+  [test] IOH_Ellipsoid_D10_r3: 900 pairs
+  [test] IOH_Ellipsoid_D5_r3: 900 pairs
+  [test] IOH_Rastrigin_D10_r3: 900 pairs
+  [test] IOH_Rastrigin_D5_r3: 900 pairs
+  [test] IOH_Rosenbrock_D10_r3: 900 pairs
+  [test] IOH_Rosenbrock_D5_r3: 900 pairs
+  [test] IOH_Sphere_D10_r3: 900 pairs
+  [test] IOH_Sphere_D5_r3: 900 pairs
+target diag: {
+  "y_quantiles": {
+    "0.05": 0.03410557189587886,
+    "0.25": 0.24535638718172423,
+    "0.5": 0.4983912488207213,
+    "0.75": 0.7269593122679731,
+    "0.95": 0.9913784583248811
+  },
+  "frac_near_tie_[.45,.55]": 0.12569444444444444,
+  "frac_decisive_>_.95_or_<_.05": 0.15125,
+  "mean_abs_delta": 1.852287015213598
+}
+Loading weights:   0%|          | 0/136 [00:00<?, ?it/s]Loading weights: 100%|██████████| 136/136 [00:00<00:00, 8270.51it/s]
+[transformers] [1mModernBertForSequenceClassification LOAD REPORT[0m from: answerdotai/ModernBERT-base
+Key               | Status     | 
+------------------+------------+-
+decoder.bias      | UNEXPECTED | 
+classifier.bias   | MISSING    | 
+classifier.weight | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+eval-only: loaded runs/p1/raw_tau1.0/model.pt
+fitted temperature T=1.345 (runtime clamp -> 1.345)
+{
+  "n": 7200,
+  "acc": 0.7270833333333333,
+  "nll_hard": 0.5688249307286078,
+  "brier_hard": 0.19172655747478456,
+  "ece": 0.08108736477016161,
+  "l1_target": 0.19459178229236232,
+  "nll_target": 0.6297918024740786,
+  "target_entropy": 0.48286210266116464,
+  "spearman_conf_strength": 0.22544565076091147,
+  "acc_T": 0.7270833333333333,
+  "nll_hard_T": 0.5879707435937637,
+  "ece_T": 0.11461799700380775,
+  "l1_target_T": 0.20084909347312094
+}
+per-function acc: {'IOH_Ellipsoid_D10': 0.7444, 'IOH_Ellipsoid_D5': 0.72, 'IOH_Rastrigin_D10': 0.7133, 'IOH_Rastrigin_D5': 0.6844, 'IOH_Rosenbrock_D10': 0.6989, 'IOH_Rosenbrock_D5': 0.7933, 'IOH_Sphere_D10': 0.7456, 'IOH_Sphere_D5': 0.7167}
+strata: [
+  {
+    "bucket": "Q1",
+    "n": 1800,
+    "acc": 0.5544444444444444,
+    "mean_y": 0.5036908258730357,
+    "mean_conf": 0.6306322688940499,
+    "mean_abs_p05": 0.13063226889404986
+  },
+  {
+    "bucket": "Q2",
+    "n": 1800,
+    "acc": 0.6833333333333333,
+    "mean_y": 0.5144983420320371,
+    "mean_conf": 0.631204306586749,
+    "mean_abs_p05": 0.13120430658674903
+  },
+  {
+    "bucket": "Q3",
+    "n": 1800,
+    "acc": 0.7583333333333333,
+    "mean_y": 0.49342512015882384,
+    "mean_conf": 0.6400648990190692,
+    "mean_abs_p05": 0.14006489901906916
+  },
+  {
+    "bucket": "Q4",
+    "n": 1800,
+    "acc": 0.9122222222222223,
+    "mean_y": 0.46828341129702156,
+    "mean_conf": 0.6820823997528189,
+    "mean_abs_p05": 0.18208239975281887
+  }
+]
+saved -> runs/p1/raw_tau1.0/metrics.json
