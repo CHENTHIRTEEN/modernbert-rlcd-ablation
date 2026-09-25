@@ -1,0 +1,88 @@
+device=cuda | train=6 calib=2 test=8 records (train dims=[5], test dims=[5, 10])
+building pairs (mode=log1p) ...
+  [calib] IOH_Ellipsoid_D5_r2: 200 pairs
+  [calib] IOH_Sphere_D5_r2: 200 pairs
+  [test] IOH_Ellipsoid_D10_r3: 900 pairs
+  [test] IOH_Ellipsoid_D5_r3: 900 pairs
+  [test] IOH_Rastrigin_D10_r3: 900 pairs
+  [test] IOH_Rastrigin_D5_r3: 900 pairs
+  [test] IOH_Rosenbrock_D10_r3: 900 pairs
+  [test] IOH_Rosenbrock_D5_r3: 900 pairs
+  [test] IOH_Sphere_D10_r3: 900 pairs
+  [test] IOH_Sphere_D5_r3: 900 pairs
+target diag: {
+  "y_quantiles": {
+    "0.05": 0.06429740916443086,
+    "0.25": 0.2947910979289214,
+    "0.5": 0.4981649027808315,
+    "0.75": 0.714088505233074,
+    "0.95": 0.9116222122728082
+  },
+  "frac_near_tie_[.45,.55]": 0.12805555555555556,
+  "frac_decisive_>_.95_or_<_.05": 0.07625,
+  "mean_abs_delta": 1.3437105903484194
+}
+Loading weights:   0%|          | 0/136 [00:00<?, ?it/s]Loading weights: 100%|██████████| 136/136 [00:00<00:00, 3637.68it/s]
+[transformers] [1mModernBertForSequenceClassification LOAD REPORT[0m from: answerdotai/ModernBERT-base
+Key               | Status     | 
+------------------+------------+-
+decoder.bias      | UNEXPECTED | 
+classifier.bias   | MISSING    | 
+classifier.weight | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+eval-only: loaded /root/modernbert-rlcd-ablation/runs/log1p_tau1.0/model.pt
+fitted temperature T=0.976 (runtime clamp -> 0.976)
+{
+  "n": 7200,
+  "acc": 0.7365277777777778,
+  "nll_hard": 0.5727708987933505,
+  "brier_hard": 0.19321768463941555,
+  "ece": 0.11000623241894777,
+  "l1_target": 0.16734960730358245,
+  "nll_target": 0.6423290567261092,
+  "target_entropy": 0.5346504983221074,
+  "spearman_conf_strength": 0.25369059195648,
+  "acc_T": 0.7365277777777778,
+  "nll_hard_T": 0.571077859060629,
+  "ece_T": 0.10730231452625878,
+  "l1_target_T": 0.16700756927763255
+}
+per-function acc: {'IOH_Ellipsoid_D10': 0.7944, 'IOH_Ellipsoid_D5': 0.7456, 'IOH_Rastrigin_D10': 0.7033, 'IOH_Rastrigin_D5': 0.6867, 'IOH_Rosenbrock_D10': 0.7678, 'IOH_Rosenbrock_D5': 0.8178, 'IOH_Sphere_D10': 0.6711, 'IOH_Sphere_D5': 0.7056}
+strata: [
+  {
+    "bucket": "Q1",
+    "n": 1800,
+    "acc": 0.5894444444444444,
+    "mean_y": 0.5101084549023504,
+    "mean_conf": 0.6174432147708204,
+    "mean_abs_p05": 0.11744321477082041
+  },
+  {
+    "bucket": "Q2",
+    "n": 1800,
+    "acc": 0.7077777777777777,
+    "mean_y": 0.5215005056886978,
+    "mean_conf": 0.616389825840791,
+    "mean_abs_p05": 0.11638982584079106
+  },
+  {
+    "bucket": "Q3",
+    "n": 1800,
+    "acc": 0.7755555555555556,
+    "mean_y": 0.4941145467319885,
+    "mean_conf": 0.624890201182829,
+    "mean_abs_p05": 0.12489020118282901
+  },
+  {
+    "bucket": "Q4",
+    "n": 1800,
+    "acc": 0.8733333333333333,
+    "mean_y": 0.4739870928208801,
+    "mean_conf": 0.6473629396408797,
+    "mean_abs_p05": 0.14736293964087963
+  }
+]
+saved -> /root/modernbert-rlcd-ablation/runs/log1p_tau1.0/metrics.json

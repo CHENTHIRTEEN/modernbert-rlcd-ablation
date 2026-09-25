@@ -1,0 +1,100 @@
+device=cuda | train=6 calib=2 test=8 records (train dims=[5], test dims=[5, 10])
+building pairs (mode=hard) ...
+  [train] IOH_Ellipsoid_D5_r1: 500 pairs
+  [train] IOH_Rastrigin_D5_r1: 500 pairs
+  [train] IOH_Rastrigin_D5_r2: 500 pairs
+  [train] IOH_Rosenbrock_D5_r1: 500 pairs
+  [train] IOH_Rosenbrock_D5_r2: 500 pairs
+  [train] IOH_Sphere_D5_r1: 500 pairs
+  [calib] IOH_Ellipsoid_D5_r2: 200 pairs
+  [calib] IOH_Sphere_D5_r2: 200 pairs
+  [test] IOH_Ellipsoid_D10_r3: 900 pairs
+  [test] IOH_Ellipsoid_D5_r3: 900 pairs
+  [test] IOH_Rastrigin_D10_r3: 900 pairs
+  [test] IOH_Rastrigin_D5_r3: 900 pairs
+  [test] IOH_Rosenbrock_D10_r3: 900 pairs
+  [test] IOH_Rosenbrock_D5_r3: 900 pairs
+  [test] IOH_Sphere_D10_r3: 900 pairs
+  [test] IOH_Sphere_D5_r3: 900 pairs
+target diag: {
+  "y_quantiles": {
+    "0.05": 0.0,
+    "0.25": 0.0,
+    "0.5": 0.0,
+    "0.75": 1.0,
+    "0.95": 1.0
+  },
+  "frac_near_tie_[.45,.55]": 0.0,
+  "frac_decisive_>_.95_or_<_.05": 1.0,
+  "mean_abs_delta": 1.9460538811145625
+}
+Loading weights:   0%|          | 0/136 [00:00<?, ?it/s]Loading weights: 100%|██████████| 136/136 [00:00<00:00, 3048.76it/s]
+[transformers] [1mModernBertForSequenceClassification LOAD REPORT[0m from: answerdotai/ModernBERT-base
+Key               | Status     | 
+------------------+------------+-
+decoder.bias      | UNEXPECTED | 
+classifier.bias   | MISSING    | 
+classifier.weight | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+bf16 autocast: True | grad ckpt: False
+steps/epoch=83 total=249 warmup=12
+  step    50/249 ep1 loss=0.6412 p̄=0.619 bs=36 lr=1.88e-05 4.28 it/s
+  step   100/249 ep2 loss=0.5688 p̄=0.643 bs=36 lr=1.39e-05 4.33 it/s
+  step   150/249 ep2 loss=0.5159 p̄=0.628 bs=37 lr=7.44e-06 4.35 it/s
+  step   200/249 ep3 loss=0.5203 p̄=0.454 bs=36 lr=2.04e-06 4.36 it/s
+training done in 1.0 min
+fitted temperature T=0.943 (runtime clamp -> 0.943)
+{
+  "n": 7200,
+  "acc": 0.6815277777777777,
+  "nll_hard": 0.5798408641465838,
+  "brier_hard": 0.19836663731615656,
+  "ece": 0.04894985036872741,
+  "l1_target": 0.3772379265130601,
+  "nll_target": 0.5798408641465838,
+  "target_entropy": 2.1723265530343085e-08,
+  "spearman_conf_strength": 0.06654598951670504,
+  "acc_T": 0.6815277777777777,
+  "nll_hard_T": 0.583012776338976,
+  "ece_T": 0.057882150718262165,
+  "l1_target_T": 0.37322955102402355
+}
+per-function acc: {}
+strata: [
+  {
+    "bucket": "Q1",
+    "n": 1800,
+    "acc": 0.5516666666666666,
+    "mean_y": 0.5283333333333333,
+    "mean_conf": 0.7322531496319505,
+    "mean_abs_p05": 0.2322531496319506
+  },
+  {
+    "bucket": "Q2",
+    "n": 1800,
+    "acc": 0.655,
+    "mean_y": 0.5366666666666666,
+    "mean_conf": 0.7239516774275236,
+    "mean_abs_p05": 0.22395167742752367
+  },
+  {
+    "bucket": "Q3",
+    "n": 1800,
+    "acc": 0.6977777777777778,
+    "mean_y": 0.4761111111111111,
+    "mean_conf": 0.7238789843022824,
+    "mean_abs_p05": 0.22387898430228234
+  },
+  {
+    "bucket": "Q4",
+    "n": 1800,
+    "acc": 0.8216666666666667,
+    "mean_y": 0.45111111111111113,
+    "mean_conf": 0.7418267012242642,
+    "mean_abs_p05": 0.24182670122426417
+  }
+]
+saved -> /root/modernbert-rlcd-ablation/runs/hard_tau1.0/metrics.json

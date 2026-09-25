@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
 .DS_Store
-runs/
 *.pt
+# runs/ 结果同步：只进 json（metrics）和 log，model.pt 由 *.pt 排除
+runs/**
+!runs/**/
+!runs/**/*.json
+!runs/**/*.log
