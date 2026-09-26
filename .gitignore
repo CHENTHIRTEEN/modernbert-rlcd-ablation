@@ -8,3 +8,6 @@ runs/**
 !runs/**/*.json
 !runs/**/*.log
 .venv/
+
+# ea_opt 在线优化实验输出
+exp_bert_data/
