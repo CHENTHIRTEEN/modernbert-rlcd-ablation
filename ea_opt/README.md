@@ -24,12 +24,16 @@
 cd ea_opt
 # 冒烟：单函数单次（ckpt 缺省 = 原生底座，cls 头随机，预期≈无代理基线）
 python run_exp_bert.py --probs LZG01 --dims 5 --runs 1
-# 正式：论文同款网格，15 问题 × D{5,10,20} × 10 runs（断点续跑，中断重跑同一命令即可）
-nohup python -u run_exp_bert.py --ckpt ../runs/hard_tau1.0/model.pt --runs 10 \
-  > exp_bert.log 2>&1 &
-# 提速：--half（CUDA fp16）；--n-anchor-cap 15 截锚点（偏离 tao=50，属额外消融）
-# 下限对照：--surrogate random（同 EA 同种子，随机投票）
+# "我们的方法"轻量配置：mean 计分 + 15 锚点（450 对/代），不看 Table I 对表时的日常跑法
+nohup python -u run_exp_bert.py --ckpt ../runs/p2/hard_tau1.0/model.pt \
+  --score mean --n-anchor-cap 15 --runs 10 > exp_mean.log 2>&1 &
+# R2SAEA 复刻配置：默认即 --score hard --n-anchor-cap 0（tao=50 全锚点 ε 权重投票），对表用
+# 提速：--half（CUDA fp16）；下限对照：--surrogate random（同 EA 同种子，随机投票）
 ```
+
+计分方式 `--score`：GA 只消费"分高者好"接口，聚合是代理内部实现——
+`hard`（默认）= R2SAEA 硬票+按 f 的 ε 权重投票（复刻用）；`mean` = 直接平均
+P(候选优于锚点)，无启发式权重（我们的计分）；`soft` = 同权重下 p 的线性扩展。
 
 ckpt 为 `train_soft_ablation.py --save-model` 产出的 `runs/<mode>_tau1.0/model.pt`（`{"state_dict": ...}`）。
 

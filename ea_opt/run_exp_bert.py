@@ -267,7 +267,7 @@ def make_surrogate(args):
     return ModernBERTRelationSurrogate(
         ckpt=args.ckpt, base_model=args.base_model, device=args.device,
         batch_size=args.batch_size, n_evidence=args.n_evidence, beta=args.beta,
-        half=args.half, max_length=args.max_length, soft_vote=args.soft_vote)
+        half=args.half, max_length=args.max_length, score_mode=args.score)
 
 
 def main():
@@ -292,8 +292,10 @@ def main():
     ap.add_argument("--beta", type=int, default=5)
     ap.add_argument("--max-length", type=int, default=1024)
     ap.add_argument("--half", action="store_true", help="CUDA 上 fp16 推理提速")
-    ap.add_argument("--soft-vote", action="store_true",
-                    help="用 p(better) 的线性扩展代替硬投票计分")
+    ap.add_argument("--score", choices=["hard", "soft", "mean"], default="hard",
+                    help="计分方式：hard=R2SAEA 硬票+ε权重投票（复刻）；"
+                         "soft=同权重、p 线性扩展；mean=平均 P(候选优于锚点)（我们的计分，"
+                         "推荐搭配 --n-anchor-cap 15）")
     ap.add_argument("--n-anchor-cap", type=int, default=0,
                     help=">0 时锚点数截到该值（提速用；0=全部 tao 个，偏离记录在案）")
     # 输出
@@ -393,7 +395,7 @@ def main():
                     "curve_fes": curve_fes, "curve_best": curve_best,
                     "config": {"n_evidence": args.n_evidence, "beta": args.beta,
                                "max_length": args.max_length, "half": args.half,
-                               "soft_vote": args.soft_vote,
+                               "score": args.score,
                                "n_anchor_cap": args.n_anchor_cap},
                 }
 

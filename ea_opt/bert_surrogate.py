@@ -45,10 +45,14 @@ def voting_weights(ys: np.ndarray, epsilon: float = 0.1) -> np.ndarray:
 class ModernBERTRelationSurrogate:
     def __init__(self, ckpt=None, base_model="answerdotai/ModernBERT-base",
                  device="auto", batch_size=256, n_evidence=12, beta=5,
-                 half=False, max_length=1024, soft_vote=False):
+                 half=False, max_length=1024, score_mode="hard"):
         """
         ckpt: train_soft_ablation.py --save-model 产出的 runs/<mode>_tau1.0/model.pt
               （内存为 {"state_dict": ...}）。为 None 时直接用原生底座（= cls 基线）。
+        score_mode: 计分方式（score 越大越好，GA 只消费 "分高者好" 这个接口）
+          hard -- R2SAEA 复刻：argmax 硬票 ±1 + 按 f 的锚点权重投票（严格对 Table I 时用）
+          soft -- 同上但票面换成 p 的线性扩展 (1-2p)·w
+          mean -- 我们的计分：直接平均 P(候选优于锚点)，无 ε 权重启发式
         """
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else (
@@ -58,7 +62,7 @@ class ModernBERTRelationSurrogate:
         self.n_evidence = n_evidence
         self.beta = beta
         self.max_length = max_length
-        self.soft_vote = soft_vote
+        self.score_mode = score_mode
 
         self.tok = AutoTokenizer.from_pretrained(base_model)
         if self.tok.pad_token_id is None:
@@ -131,14 +135,17 @@ class ModernBERTRelationSurrogate:
                 texts_b.append(ev)
 
         p = self._pair_probs(texts_a, texts_b).reshape(n_anchor, n_cand)
-        # element[j, i] = +1 表示锚点 i 优于候选 j（与 R2SAEA 的 element 矩阵同约定）
-        element = np.where(p.T > 0.5, 1, -1)
 
         w = voting_weights(ys)
-        if self.soft_vote:
+        if self.score_mode == "mean":
+            # 我们的计分：P(候选优于各锚点) 的直接平均，概率幅值直接进排序
+            scores = (1.0 - p).mean(axis=0)
+        elif self.score_mode == "soft":
             # 硬投票的线性扩展：p=1 -> -w，p=0 -> +w
             scores = (1.0 - 2.0 * p.T) @ w
         else:
+            # element[j, i] = +1 表示锚点 i 优于候选 j（与 R2SAEA 的 element 矩阵同约定）
+            element = np.where(p.T > 0.5, 1, -1)
             scores = (-1.0 * element * w[None, :]).sum(axis=1)
 
         self.last_stats = {
