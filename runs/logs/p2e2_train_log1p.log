@@ -1,0 +1,111 @@
+device=cuda | train=14 calib=2 test=8 records (train dims=[5], test dims=[5, 10])
+building pairs (mode=log1p) ...
+  [train] IOH_Ellipsoid_D5_r1: 500 pairs
+  [train] IOH_Ellipsoid_D5_r4: 500 pairs
+  [train] IOH_Ellipsoid_D5_r5: 500 pairs
+  [train] IOH_Rastrigin_D5_r1: 500 pairs
+  [train] IOH_Rastrigin_D5_r2: 500 pairs
+  [train] IOH_Rastrigin_D5_r4: 500 pairs
+  [train] IOH_Rastrigin_D5_r5: 500 pairs
+  [train] IOH_Rosenbrock_D5_r1: 500 pairs
+  [train] IOH_Rosenbrock_D5_r2: 500 pairs
+  [train] IOH_Rosenbrock_D5_r4: 500 pairs
+  [train] IOH_Rosenbrock_D5_r5: 500 pairs
+  [train] IOH_Sphere_D5_r1: 500 pairs
+  [train] IOH_Sphere_D5_r4: 500 pairs
+  [train] IOH_Sphere_D5_r5: 500 pairs
+  [calib] IOH_Ellipsoid_D5_r2: 600 pairs
+  [calib] IOH_Sphere_D5_r2: 600 pairs
+  [test] IOH_Ellipsoid_D10_r3: 900 pairs
+  [test] IOH_Ellipsoid_D5_r3: 900 pairs
+  [test] IOH_Rastrigin_D10_r3: 900 pairs
+  [test] IOH_Rastrigin_D5_r3: 900 pairs
+  [test] IOH_Rosenbrock_D10_r3: 900 pairs
+  [test] IOH_Rosenbrock_D5_r3: 900 pairs
+  [test] IOH_Sphere_D10_r3: 900 pairs
+  [test] IOH_Sphere_D5_r3: 900 pairs
+target diag: {
+  "y_quantiles": {
+    "0.05": 0.058216812474056856,
+    "0.25": 0.29152105646974547,
+    "0.5": 0.5044452685569611,
+    "0.75": 0.728867024597953,
+    "0.95": 0.9480794883603414
+  },
+  "frac_near_tie_[.45,.55]": 0.12387323943661972,
+  "frac_decisive_>_.95_or_<_.05": 0.09394366197183099,
+  "mean_abs_delta": 1.4106311862874124
+}
+Loading weights:   0%|          | 0/136 [00:00<?, ?it/s]Loading weights: 100%|██████████| 136/136 [00:00<00:00, 5323.57it/s]
+[transformers] [1mModernBertForSequenceClassification LOAD REPORT[0m from: answerdotai/ModernBERT-base
+Key               | Status     | 
+------------------+------------+-
+decoder.bias      | UNEXPECTED | 
+classifier.bias   | MISSING    | 
+classifier.weight | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+bf16 autocast: True | grad ckpt: False
+steps/epoch=193 total=386 warmup=19
+  step    50/386 ep1 loss=0.7477 p̄=0.522 bs=36 lr=1.96e-05 4.23 it/s
+  step   100/386 ep1 loss=0.6370 p̄=0.557 bs=36 lr=1.77e-05 4.30 it/s
+  step   150/386 ep1 loss=0.6379 p̄=0.513 bs=36 lr=1.43e-05 4.33 it/s
+  step   200/386 ep2 loss=0.6308 p̄=0.511 bs=36 lr=1.02e-05 4.34 it/s
+  step   250/386 ep2 loss=0.6285 p̄=0.471 bs=36 lr=6.05e-06 4.35 it/s
+  step   300/386 ep2 loss=0.6186 p̄=0.476 bs=37 lr=2.59e-06 4.35 it/s
+  step   350/386 ep2 loss=0.6205 p̄=0.520 bs=36 lr=4.71e-07 4.35 it/s
+training done in 1.5 min
+fitted temperature T=1.024 (runtime clamp -> 1.024)
+{
+  "n": 7200,
+  "acc": 0.7180555555555556,
+  "nll_hard": 0.5757103881957245,
+  "brier_hard": 0.19530225089092954,
+  "ece": 0.0777500408556726,
+  "l1_target": 0.16981530505994774,
+  "nll_target": 0.6493683118192014,
+  "target_entropy": 0.5346504983221074,
+  "spearman_conf_strength": 0.2612301216479576,
+  "acc_T": 0.7180555555555556,
+  "nll_hard_T": 0.5770003078533723,
+  "ece_T": 0.08050180587945101,
+  "l1_target_T": 0.16990174366786173
+}
+per-function acc: {'IOH_Ellipsoid_D10': 0.7422, 'IOH_Ellipsoid_D5': 0.7456, 'IOH_Rastrigin_D10': 0.6744, 'IOH_Rastrigin_D5': 0.71, 'IOH_Rosenbrock_D10': 0.7544, 'IOH_Rosenbrock_D5': 0.8144, 'IOH_Sphere_D10': 0.6, 'IOH_Sphere_D5': 0.7033}
+strata: [
+  {
+    "bucket": "Q1",
+    "n": 1800,
+    "acc": 0.5616666666666666,
+    "mean_y": 0.5101084549023504,
+    "mean_conf": 0.642223495228423,
+    "mean_abs_p05": 0.142223495228423
+  },
+  {
+    "bucket": "Q2",
+    "n": 1800,
+    "acc": 0.6794444444444444,
+    "mean_y": 0.5215005056886978,
+    "mean_conf": 0.6349608299798436,
+    "mean_abs_p05": 0.13496082997984357
+  },
+  {
+    "bucket": "Q3",
+    "n": 1800,
+    "acc": 0.7577777777777778,
+    "mean_y": 0.49411454673198846,
+    "mean_conf": 0.6329263406991958,
+    "mean_abs_p05": 0.13292634069919587
+  },
+  {
+    "bucket": "Q4",
+    "n": 1800,
+    "acc": 0.8733333333333333,
+    "mean_y": 0.4739870928208801,
+    "mean_conf": 0.6511113928920693,
+    "mean_abs_p05": 0.1511113928920693
+  }
+]
+saved -> runs/p2e2/log1p_tau1.0/metrics.json
