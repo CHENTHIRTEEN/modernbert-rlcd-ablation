@@ -284,7 +284,9 @@ def main():
     ap.add_argument("--seed-base", type=int, default=0)
     ap.add_argument("--pop-size", type=int, default=30)
     ap.add_argument("--n-evals", type=int, default=300)
-    ap.add_argument("--tao", type=int, default=50)
+    ap.add_argument("--tao", type=int, default=50,
+                    help="每代喂代理的锚点池上限（取档案 f 最优前 tao 个）；"
+                         "--n-anchor-cap>0 时实际锚点数=cap（cap≤tao 时本参数不影响结果），仅复刻模式 cap=0 下生效")
     # 代理侧
     ap.add_argument("--device", default="auto")
     ap.add_argument("--batch-size", type=int, default=256)
@@ -337,8 +339,10 @@ def main():
           f"surrogate={args.surrogate}({surrogate_tag}) out={out_dir}")
     print(f"[resume] {len(done)} runs already done")
 
-    est_pairs = min(args.tao, args.pop_size) * args.pop_size
-    print(f"[est] ~{est_pairs} pairs/generation, {args.n_evals - args.pop_size} generations/run")
+    n_anchor_eff = min(args.n_anchor_cap, args.tao) if args.n_anchor_cap else min(args.tao, args.pop_size)
+    est_pairs = n_anchor_eff * args.pop_size
+    print(f"[est] ~{est_pairs} pairs/generation (anchors={n_anchor_eff}), "
+          f"{args.n_evals - args.pop_size} generations/run")
 
     # 代理整个实验只建一次（模型加载一次；fit 每代覆盖缓存数据）
     surrogate = make_surrogate(args)
