@@ -309,8 +309,16 @@ def main():
     summary_path = out_dir / "summary.csv"
 
     probs = parse_probs(args.probs)
-    surrogate_tag = (args.surrogate if args.surrogate == "random"
-                     else Path(args.ckpt).parent.name if args.ckpt else "raw-base")
+    # 模型标识：取 ckpt 路径的 <probe>/<mode>_tau*，p1/p2/p2e2 天然区分；
+    # key/summary/flat 全部按 tag 隔离，多个 checkpoint 可写同一个 out-dir 不串数据
+    if args.surrogate == "random":
+        surrogate_tag = "random"
+    elif args.ckpt:
+        p = Path(args.ckpt)
+        surrogate_tag = (f"{p.parent.parent.name}/{p.parent.name}"
+                         if str(p.parent.parent) not in ("", ".", "/") else p.parent.name)
+    else:
+        surrogate_tag = "raw-base"
 
     # 断点续跑：读已完成 key
     done = set()
@@ -333,7 +341,7 @@ def main():
     # 代理整个实验只建一次（模型加载一次；fit 每代覆盖缓存数据）
     surrogate = make_surrogate(args)
 
-    flat_header = "prob,dim,run,seed,best_f,wall_s,n_pairs_total,mean_vote_better"
+    flat_header = "prob,surrogate_tag,dim,run,seed,best_f,wall_s,n_pairs_total,mean_vote_better"
     if not flat_path.exists():
         flat_path.write_text(flat_header + "\n")
 
@@ -343,7 +351,7 @@ def main():
         for Dim in args.dims:
             for r in range(1, args.runs + 1):
                 seed = args.seed_base + r - 1
-                key = f"{prob_name}_D{Dim}_r{r}"
+                key = f"{surrogate_tag}/{prob_name}_D{Dim}_r{r}"
                 if key in done:
                     continue
 
@@ -397,7 +405,7 @@ def main():
                 n_done_this_session += 1
 
                 with open(flat_path, "a") as f:
-                    f.write(f"{prob_name},{Dim},{r},{seed},{rec['best_f']:.6g},"
+                    f.write(f"{prob_name},{surrogate_tag},{Dim},{r},{seed},{rec['best_f']:.6g},"
                             f"{rec['wall_s']},{rec['n_pairs_total']},"
                             f"{rec['mean_vote_better']:.4f}\n")
 
@@ -406,14 +414,17 @@ def main():
                       f"(session done={n_done_this_session}, "
                       f"elapsed={(time.time() - t_all) / 60:.0f}min)", flush=True)
 
-    # ---- 汇总（论文 result.csv 风格：均值/标准差/运行数） ----
+    # ---- 汇总（论文 result.csv 风格：均值/标准差/运行数；按模型 tag 分组） ----
     agg = {}
+    alg_by_tag = {}
     for rec in records:
-        agg.setdefault((rec["prob"], rec["dim"]), []).append(rec["best_f"])
+        tag = rec.get("surrogate_tag", "unknown")
+        agg.setdefault((rec["prob"], rec["dim"], tag), []).append(rec["best_f"])
+        alg_by_tag.setdefault(tag, rec.get("alg", args.alg_name))
     lines = ["算法,问题,维度,均值,标准差,运行数"]
-    for (prob, dim) in sorted(agg, key=lambda k: (k[0], k[1])):
-        vals = np.array(agg[(prob, dim)], dtype=float)
-        lines.append(f"{args.alg_name},{prob},{dim},{vals.mean():.6f},"
+    for (prob, dim, tag) in sorted(agg, key=lambda k: (k[2], k[0], k[1])):
+        vals = np.array(agg[(prob, dim, tag)], dtype=float)
+        lines.append(f"{alg_by_tag[tag]}[{tag}],{prob},{dim},{vals.mean():.6f},"
                      f"{vals.std(ddof=0):.6f},{len(vals)}")
     summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[done] {n_done_this_session} new runs, total {len(records)}; "
