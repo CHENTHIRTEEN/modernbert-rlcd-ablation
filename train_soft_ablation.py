@@ -442,7 +442,7 @@ def main():
         sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
         print(f"steps/epoch={steps_per_epoch} total={total_steps} warmup={warmup}", flush=True)
 
-        step, t0, run_loss, run_n = 0, time.time(), 0.0, 0
+        step, t0, run_loss, run_h, run_n = 0, time.time(), 0.0, 0.0, 0
         done = False
         for ep in range(args.epochs):
             batches = ep_batches if ep == 0 else make_batches(train_items, args.max_tokens, rng)
@@ -454,6 +454,9 @@ def main():
                 logp = F.log_softmax(logits, -1)
                 t = torch.stack([1 - y, y], -1)
                 loss = -(t * logp).sum(-1).mean()
+                with torch.no_grad():     # 目标熵底 H(t)：loss-H=KL 才是可比的拟合残差
+                    run_h += float((-(t.clamp_min(1e-9) * t.clamp_min(1e-9).log())
+                                    .sum(-1).mean()) * len(idxs))
                 if not math.isfinite(loss.item()):
                     if device.type == "mps":
                         torch.mps.empty_cache()
@@ -470,10 +473,12 @@ def main():
                 if step % 50 == 0:
                     with torch.no_grad():
                         p̄ = torch.softmax(logits, -1)[:, 1].mean().item()
+                    H = run_h / run_n
                     print(f"  step {step:5d}/{total_steps} ep{ep + 1} loss={run_loss / run_n:.4f} "
+                          f"H={H:.3f} KL={run_loss / run_n - H:.3f} "
                           f"p̄={p̄:.3f} bs={len(idxs)} lr={sched.get_last_lr()[0]:.2e} "
                           f"{step / (time.time() - t0):.2f} it/s", flush=True)
-                    run_loss, run_n = 0.0, 0
+                    run_loss, run_h, run_n = 0.0, 0.0, 0
                 if args.max_steps and step >= args.max_steps:
                     done = True; break
             if done:
