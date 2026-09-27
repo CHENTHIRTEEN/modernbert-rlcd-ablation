@@ -24,7 +24,21 @@ y = σ( (f_B − f_A) / ((s_f + ε) · τ) )        # y = P(A better than B)，�
 
 ## 数据
 
-`gen_data.py` 用 [ioh](https://github.com/iohprofiler/IOHexperimenter) BBOB REAL 套件生成（已预生成在 `data/`，可直接用）：
+### bbob54（当前主数据集）
+
+`gen_bbob_data.py` 用 [coco-experiment](https://github.com/numbbo/coco)（COCO 官方 Python 接口，import 名 `cocoex`）生成 **BBOB + BBOB-noisy 全套件**（已预生成在 `data_bbob54/`，12MB，可直接用；ioh 0.3.x 不含 noisy 套件故改用 cocoex）：
+
+- 函数：BBOB f1–f24（无噪）+ BBOB-noisy f101–f130（gauss/uniform/cauchy）共 54 个 × instance(rep) 1–3 × 维度 5, 10, 20 = 486 条 record
+- 每个 record：LHS 采样 100 点（[-5,5]^D，随机置换后前 50 作锚点/证据池、后 50 作候选，置换避免 LHS 分层偏向半值域）
+- **切分约定与旧数据完全一致**：rep=instance；D5 的 rep1/rep2 训练（Sphere/Ellipsoid 的 rep2 只做温度校准），rep3 全部维度评测（D5 分布内 + D10/D20 零样本迁移）
+- `prob_name`：无噪 = `IOH_{ioh名}`（与旧数据对齐，`IOH_Sphere`/`IOH_Ellipsoid` 仍作 calib），noisy = `IOH_n{fid}_{gauss|unif|cauchy}`；另附 `suite/fid/instance/noise/coco_id` 溯源字段
+- **noisy 语义**：噪声随求值流推进（每个 y 是该求值位置的一次抽样，cocoex 禁止重复求值）；固定种子 + 固定求值顺序 ⇒ 同种子重放逐位一致（已验证）
+
+训练对规模：D5 rep1/2 共 106 record × 500 对 = **5.3 万对/epoch**（旧 4 函数数据集约 3000 对）。
+
+### 旧数据集（ioh 4 函数，保留作对照）
+
+`gen_data.py` 用 [ioh](https://github.com/iohprofiler/IOHexperimenter) BBOB REAL 套件生成（已预生成在 `data/`）：
 
 - 函数：Sphere(1) / Ellipsoid(2) / Rastrigin(3) / Rosenbrock(8) × 维度 5, 10 × instance(rep) 1–3
 - 每个 record：LHS 采样 30 锚点 + 30 候选，存原始 X 与真值 f
@@ -35,18 +49,20 @@ y = σ( (f_B − f_A) / ((s_f + ε) · τ) )        # y = P(A better than B)，�
 ## 快速开始（Linux/CUDA 服务器）
 
 ```bash
-pip install -r requirements.txt
-mkdir -p runs/logs
+# bbob54 数据集（推荐，数据已随仓库提交，无需重新生成）：
+bash bbob54_run.sh 2>&1 | tee runs/logs/bbob54_all.log
+# 等价手写：
 for m in hard raw log1p; do
-  python -u train_soft_ablation.py --target-mode $m \
-    --model-path answerdotai/ModernBERT-base \
-    --amp --max-tokens 16000 --save-model \
-    2>&1 | tee runs/logs/train_$m.log
+  python -u train_soft_ablation.py --target-mode $m --data-dir data_bbob54 \
+    --epochs 2 --calib-pairs 600 --max-tokens 16000 --max-length 1600 \
+    --model-path answerdotai/ModernBERT-base --amp --save-model --tag bbob54 \
+    2>&1 | tee runs/logs/bbob54_train_$m.log
 done
 ```
 
 - 设备自动选择 cuda > mps > cpu；CUDA 上建议 `--amp`（bf16 autocast）；显存 ≤16GB 时加 `--grad-ckpt`
-- 单组 A100/4090 约 5–15 分钟；每组产出 `runs/<mode>_tau1.0/metrics.json`
+- `--max-length 1600` 为 D20 评测所需（D5 训练对实际远短于此）
+- 每组产出 `runs/<tag>_<mode>_tau<tau>_e<epochs>_D<dims>_seed<seed>/`：`metrics.json` + 同名 `.pt` 权重；`--tag`/seed/epochs 变更都会产生新目录，不再互相覆盖
 
 ## 主要参数
 
@@ -54,9 +70,11 @@ done
 |---|---|---|
 | `--target-mode` | 必填 | `hard` / `raw` / `log1p` |
 | `--tau` | 1.0 | 目标锐度（与 s_f 相乘进入分母；改 s_f 语义优先） |
+| `--data-dir` | `data/` | 数据目录；bbob54 数据集传 `data_bbob54` |
+| `--tag` | `bbob54` | 运行标识，进输出目录/权重文件名 |
 | `--train-dims` | 5 | 训练维度；评测始终覆盖数据中 rep3 的全部维度 |
-| `--pairs-per-record` | 500 | 每 record 训练对数上限（D5 每 record 共 900 对） |
-| `--epochs` / `--max-tokens` | 3 / 5000 | 轮数 / token 预算批（MPS 用默认，CUDA 可放大） |
+| `--pairs-per-record` / `--test-pairs` | 500 / 500 | 每 record 训练/评测对数上限（0=全量；固定种子，跨 mode 可比） |
+| `--epochs` / `--max-tokens` | 2 / 5000 | 轮数（p2e2 消融：2ep 全面优于 3ep）/ token 预算批（MPS 用默认，CUDA 可放大） |
 | `--lr` | 2e-5 | AdamW，cosine + 5% warmup，clip 1.0 |
 | `--stats-only` | 关 | 只打印目标分布诊断，不训练 |
 

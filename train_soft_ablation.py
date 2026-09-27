@@ -117,12 +117,13 @@ def build_pairs(records, args, mode, subset: str):
                     "func": rec["prob_name"], "dim": rec["prob_D"],
                 })
 
-        # 子采样（train/calib），全局固定种子 -> 三种 mode 看到同一批对
-        if subset in ("train", "calib"):
-            cap = args.pairs_per_record if subset == "train" else args.calib_pairs
-            if cap and len(metas) > cap:
-                idx = np.random.default_rng(args.seed + 7).choice(len(metas), cap, replace=False)
-                metas = [metas[j] for j in sorted(idx)]
+        # 子采样，全局固定种子 -> 同 seed 下三种 mode 看到同一批对（跨 config 可比）
+        cap = {"train": args.pairs_per_record, "calib": args.calib_pairs,
+               "test": args.test_pairs}[subset]
+        if cap and len(metas) > cap:
+            salt = 13 if subset == "test" else 7
+            idx = np.random.default_rng(args.seed + salt).choice(len(metas), cap, replace=False)
+            metas = [metas[j] for j in sorted(idx)]
 
         enc = _tok([m["text_a"] for m in metas], [m["text_b"] for m in metas], args.max_length)
         for m, ids in zip(metas, enc):
@@ -329,7 +330,10 @@ def main():
                     help="训练用维度；test 始终评测数据里 rep3 的全部维度")
     ap.add_argument("--pairs-per-record", type=int, default=500)
     ap.add_argument("--calib-pairs", type=int, default=200)
-    ap.add_argument("--epochs", type=int, default=3)
+    ap.add_argument("--test-pairs", type=int, default=500,
+                    help="每条 test record 的对数上限（0=全量 2500）；固定种子保证跨 mode 可比")
+    ap.add_argument("--epochs", type=int, default=2,
+                    help="训练轮数；p2 消融结论 2ep 全面优于 3ep，新数据量下沿用 2")
     ap.add_argument("--max-tokens", type=int, default=3000)
     ap.add_argument("--amp", action="store_true",
                     help="bf16 autocast（MPS + ModernBERT 已知会 NaN，默认关）")
@@ -343,7 +347,10 @@ def main():
     ap.add_argument("--max-steps", type=int, default=0, help=">0 时只训这么多步（smoke）")
     ap.add_argument("--eval-max-records", type=int, default=0, help=">0 时评测只取前 N 条 test record（smoke）")
     ap.add_argument("--eval-only", action="store_true",
-                    help="跳过训练，从 runs/<mode>_tau1.0/model.pt 加载权重直接评测（要求此前用 --save-model 训过）")
+                    help="跳过训练，从 <out-root>/<run_name>/<run_name>.pt 加载权重直接评测"
+                         "（要求 --tag/--epochs/--train-dims/--seed 与训练时一致，且此前用过 --save-model）")
+    ap.add_argument("--tag", default="bbob54",
+                    help="运行标识（进输出目录/权重文件名），区分数据集与配置，避免互相覆盖")
     ap.add_argument("--stats-only", action="store_true")
     ap.add_argument("--save-model", action="store_true")
     args = ap.parse_args()
@@ -392,7 +399,9 @@ def main():
     if args.stats_only:
         return
 
-    out_dir = Path(args.out_root) / f"{args.target_mode}_tau{args.tau}"
+    run_name = (f"{args.tag}_{args.target_mode}_tau{args.tau}_e{args.epochs}"
+                f"_D{'-'.join(map(str, args.train_dims))}_seed{args.seed}")
+    out_dir = Path(args.out_root) / run_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_path, num_labels=2).to(device)
@@ -402,7 +411,7 @@ def main():
     use_amp = False
     pad_id = _TOK.pad_token_id
     if args.eval_only:
-        ckpt_path = out_dir / "model.pt"
+        ckpt_path = out_dir / f"{run_name}.pt"
         model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True)["state_dict"])
         train_minutes, step = 0.0, 0
         print(f"eval-only: loaded {ckpt_path}", flush=True)
@@ -483,8 +492,10 @@ def main():
     p_test = predict(model, test_used, pad_id, device, eval_budget, use_amp)
 
     res = {
+        "run_name": run_name,
         "mode": args.target_mode, "tau": args.tau, "T_fit": T_fit, "T_use": T_use,
         "train_minutes": train_minutes, "steps": step, "diag": diag,
+        "test_pairs_cap": args.test_pairs,
         "overall": evaluate(p_test, test_used, T_use),
         "per_func": {},
         "strata": strata(p_test, test_used),
@@ -500,8 +511,10 @@ def main():
 
     (out_dir / "metrics.json").write_text(json.dumps(res, indent=2, ensure_ascii=False))
     if args.save_model:
-        torch.save({"state_dict": model.state_dict(), "mode": args.target_mode, "tau": args.tau},
-                   out_dir / "model.pt")
+        torch.save({"state_dict": model.state_dict(), "mode": args.target_mode,
+                    "tau": args.tau, "run_name": run_name},
+                   out_dir / f"{run_name}.pt")
+        print(f"saved -> {out_dir / f'{run_name}.pt'}")
     print(json.dumps({k: v for k, v in res["overall"].items()}, indent=2))
     print("per-function acc:",
           {k: round(v["acc"], 4) for k, v in res["per_func"].items()})
