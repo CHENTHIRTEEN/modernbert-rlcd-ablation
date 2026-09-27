@@ -24,7 +24,18 @@ y = σ( (f_B − f_A) / ((s_f + ε) · τ) )        # y = P(A better than B)，�
 
 ## 数据
 
-### bbob54（当前主数据集）
+### ga54（GA 轨迹数据集，当前主线）
+
+`gen_ga_data.py` 按 R2SAEA 论文 III-B2 的语料协议生成**真实优化轨迹**（pymoo 默认 GA + cocoex 真值；已预生成在 `data_ga54/`，gzip jsonl，可直接用）：
+
+- 轨迹：54 函数（bbob + bbob-noisy）× instance 1–3 × **seed 1–5** = 810 条 GA 轨迹；每条 pop_size=100、100 代、pymoo 默认算子（SBX 0.9/η15 + PM η20 + 锦标赛）
+- 快照：**每 10 代取当代种群**（gens 10..100，每轨迹 10 个快照）→ 每 (函数,instance,seed,gen) 一条 record，共 **8100 条**
+- record 内 100 个体随机置换后 50 作锚点/证据池、50 作候选；`fes = 100×(gen+1)`（gen10 → 1100，与 R2SAEA test_data 口径一致）
+- **切分**：rep=seed；seed {1,2,4,5} 训练、**seed 3 为 held-out 测试**（同函数同 instance 的未见轨迹）、Sphere/Ellipsoid 的 seed2 只做温度校准
+- 输出 `.jsonl.gz`（控 git 体积；`load_records` 已兼容）；GA 由 pymoo seed 决定，noisy 噪声随求值流推进（同版本重放逐位一致）
+- 注意：易函数 ~gen50 后种群高度收敛（近平局对为主），软目标的 margin 加权与 y→0.5 机制正为此设计；训练侧以 `--pairs-per-record 150` 控制单 epoch 规模（96 万对）
+
+### bbob54（LHS 数据集，2026-09-27 前主线）
 
 `gen_bbob_data.py` 用 [coco-experiment](https://github.com/numbbo/coco)（COCO 官方 Python 接口，import 名 `cocoex`）生成 **BBOB + BBOB-noisy 全套件**（已预生成在 `data_bbob54/`，12MB，可直接用；ioh 0.3.x 不含 noisy 套件故改用 cocoex）：
 
@@ -49,14 +60,16 @@ y = σ( (f_B − f_A) / ((s_f + ε) · τ) )        # y = P(A better than B)，�
 ## 快速开始（Linux/CUDA 服务器）
 
 ```bash
-# bbob54 数据集（推荐，数据已随仓库提交，无需重新生成）：
+# ga54 GA 轨迹数据集（推荐，数据已随仓库提交，无需重新生成）：
+bash ga54_run.sh 2>&1 | tee runs/logs/ga54_all.log
+# 或 bbob54 LHS 数据集：
 bash bbob54_run.sh 2>&1 | tee runs/logs/bbob54_all.log
-# 等价手写：
-for m in hard raw log1p; do
-  python -u train_soft_ablation.py --target-mode $m --data-dir data_bbob54 \
-    --epochs 2 --calib-pairs 600 --max-tokens 16000 --max-length 1600 \
-    --model-path answerdotai/ModernBERT-base --amp --save-model --tag bbob54 \
-    2>&1 | tee runs/logs/bbob54_train_$m.log
+# 等价手写（ga54）：
+for m in raw hard log1p; do
+  python -u train_soft_ablation.py --target-mode $m --data-dir data_ga54 \
+    --pairs-per-record 150 --epochs 2 --calib-pairs 600 --max-tokens 16000 \
+    --model-path answerdotai/ModernBERT-base --amp --save-model --tag ga54 \
+    2>&1 | tee runs/logs/ga54_train_$m.log
 done
 ```
 

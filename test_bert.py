@@ -17,6 +17,7 @@ x 的处理与 R2SAEA 完全一致 (src/llm4surrogate/model.py):
 
 标签: 最小化问题, y_A < y_B -> better(1), 否则 worse(0)
 """
+import gzip
 import json
 import argparse
 from pathlib import Path
@@ -51,14 +52,18 @@ def evidence_block(Ns: np.ndarray, ys: np.ndarray, anchor: int,
 
 def load_records(data_dir: Path):
     records = []
-    for fp in sorted(data_dir.glob("*.jsonl")):
-        for line in open(fp, encoding="utf-8"):
-            d = json.loads(line)
-            d["X_train"] = np.array(d["X_train"])
-            d["y_train"] = np.array(d["y_train"])
-            d["X_test"] = np.array(d["X_test"])
-            d["y_test"] = np.array(d["y_test"])
-            records.append(d)
+    fps = sorted(data_dir.glob("*.jsonl")) + sorted(data_dir.glob("*.jsonl.gz"))
+    for fp in fps:
+        opener = gzip.open(fp, "rt", encoding="utf-8") if fp.suffix == ".gz" \
+            else open(fp, encoding="utf-8")
+        with opener as f:
+            for line in f:
+                d = json.loads(line)
+                d["X_train"] = np.array(d["X_train"])
+                d["y_train"] = np.array(d["y_train"])
+                d["X_test"] = np.array(d["X_test"])
+                d["y_test"] = np.array(d["y_test"])
+                records.append(d)
     return records
 
 

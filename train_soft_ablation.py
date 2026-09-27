@@ -63,9 +63,18 @@ def record_scale(rec, mode: str) -> tuple[np.ndarray, np.ndarray, float]:
     return ft, fu, max(s, 1e-12)
 
 
+def _sigmoid(z: float) -> float:
+    """数值稳定 sigmoid：z<-710 时 math.exp(-z) 会 OverflowError（GA 收敛种群下
+    s=MAD 可退化到 1e-12，个别 Δf/s 可达 1e9）。"""
+    if z >= 0:
+        return 1.0 / (1.0 + math.exp(-z))
+    e = math.exp(z)
+    return e / (1.0 + e)
+
+
 def soft_target(f_a: float, f_b: float, s: float, eps_rel: float, tau: float) -> float:
     z = (f_b - f_a) / ((s * (1.0 + eps_rel)) * tau)
-    return float(1.0 / (1.0 + math.exp(-z)))     # y = P(A better than B)
+    return _sigmoid(z)                          # y = P(A better than B)
 
 
 # ---------------- 数据构建 ----------------

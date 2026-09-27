@@ -1,6 +1,7 @@
 torch>=2.4
 transformers>=4.48
 numpy>=1.26
-# 仅重新生成数据时需要（data/ 与 data_bbob54/ 已含预生成数据，训练不需要）：
+pymoo>=0.6            # 仅重新生成 ga54 数据时需要（data_ga54/ 已含预生成数据）
+# 仅重新生成数据时需要（data/、data_bbob54/、data_ga54/ 已含预生成数据，训练不需要）：
 # ioh>=0.4.12            # 旧 4 函数数据集（gen_data.py）
-# coco-experiment>=2.8   # bbob54 数据集（gen_bbob_data.py），ioh 0.3.x 无 noisy 套件
+# coco-experiment>=2.8   # bbob54/ga54 数据集（gen_bbob_data.py、gen_ga_data.py），ioh 0.3.x 无 noisy 套件
