@@ -2,9 +2,9 @@
 # bbob54 重训：BBOB+BBOB-noisy 54函数 × 3instance × 100LHS点（D5 训练，rep3 D5/10/20 评测）
 # 3 target-mode × epochs=2（p2e2 口径）；数据已随仓库提交（data_bbob54/，12MB，无需重新生成）
 # 规模：106 record × 500 对 = 5.3 万对/epoch（旧 4 函数数据的 ~18 倍），4090 上每 mode 约 40-60 分钟
-# 冒烟（~3 分钟）：先跑
+# 冒烟（~3 分钟，写独立 runs/smoke_*，不碰正式产物）：
 #   $PY -u train_soft_ablation.py --target-mode raw --data-dir data_bbob54 \
-#     --max-steps 20 --eval-max-records 1 --pairs-per-record 120 --test-pairs 100 --save-model
+#     --max-steps 20 --eval-max-records 1 --pairs-per-record 120 --test-pairs 100 --tag smoke
 set -o pipefail
 cd /root/modernbert-rlcd-ablation
 export HF_HUB_OFFLINE=1
