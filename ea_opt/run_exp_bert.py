@@ -319,8 +319,12 @@ def main():
         surrogate_tag = "random"
     elif args.ckpt:
         p = Path(args.ckpt)
-        surrogate_tag = (f"{p.parent.parent.name}/{p.parent.name}"
-                         if str(p.parent.parent) not in ("", ".", "/") else p.parent.name)
+        if p.stem == p.parent.name:      # 新命名 runs/<run_name>/<run_name>.pt（ga54/bbob54 产物）
+            surrogate_tag = p.stem
+        elif str(p.parent.parent) not in ("", ".", "/"):
+            surrogate_tag = f"{p.parent.parent.name}/{p.parent.name}"  # 旧 probe 结构 runs/<probe>/<mode>/model.pt
+        else:
+            surrogate_tag = p.parent.name
     else:
         surrogate_tag = "raw-base"
 
