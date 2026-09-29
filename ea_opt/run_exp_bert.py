@@ -136,6 +136,21 @@ class UEDA(GeneticAlgorithm):
             self.problem, self.pop, self.n_offsprings, algorithm=self,
             unevaluated_pop=self.unevaluated_pop)
 
+        # 运行时场景抓取（诊断用）：锚点=代理实际看到的（tao/cap 后）集合，
+        # 候选真值用旁路求值（LZG/YLL 纯 Python 无内部预算；不进 evaluator 计数）。
+        # 注意 YLLF07 带随机噪声，重评值与 EA 将来拿到的值有噪声级差异，诊断可接受。
+        if self.dump_path is not None:
+            self._dump_gen += 1
+            F_true = np.asarray(self.problem.evaluate(infills.get("X"))).flatten()
+            with open(self.dump_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({
+                    **self.dump_meta, "gen": self._dump_gen,
+                    "X_train": np.asarray(t_xs).tolist(),
+                    "y_train": np.asarray(t_ys).flatten().tolist(),
+                    "X_test": infills.get("X").tolist(),
+                    "y_test": F_true.tolist(),
+                }, ensure_ascii=False) + "\n")
+
         x_best, unevaluated_pop = self.surrogate_assisted_selection(infills)
         self.unevaluated_pop = unevaluated_pop
         return Population.new(X=x_best)
@@ -166,9 +181,13 @@ class LSEA_BERT(UEDA):
 
     def __init__(self, pop_size=50, tao=50, sampling=LHS(),
                  output=SingleObjectiveOutput(), surrogate=None,
-                 reproduction=None, run_seed=0, anchor_cap=0, **kwargs):
+                 reproduction=None, run_seed=0, anchor_cap=0,
+                 dump_path=None, dump_meta=None, **kwargs):
         self.run_seed = run_seed
         self.anchor_cap = anchor_cap
+        self.dump_path = dump_path
+        self.dump_meta = dump_meta or {}
+        self._dump_gen = 0
         super().__init__(pop_size=pop_size, tao=tao, sampling=sampling,
                          output=output, surrogate=surrogate,
                          reproduction=reproduction, **kwargs)
@@ -307,6 +326,9 @@ def main():
                     help=">0 时锚点数截到该值（提速用；0=全部 tao 个，偏离记录在案）")
     # 输出
     ap.add_argument("--out-dir", default="./exp_bert_data")
+    ap.add_argument("--dump-dir", default=None,
+                    help="每代落盘 (锚点,候选,候选真值) 场景 jsonl（诊断用；"
+                         "真值旁路求值不占 EA 预算，供 scenario_replay.py 冻结回放）")
     ap.add_argument("--alg-name", default="MBERT-LSEA")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
@@ -380,13 +402,22 @@ def main():
 
                 problem = build_problem(prob_name, Dim)
                 seed_all(seed)
+                dump_path = None
+                if args.dump_dir:
+                    Path(args.dump_dir).mkdir(parents=True, exist_ok=True)
+                    fname = f"{surrogate_tag}_{prob_name}_D{Dim}_r{r}.jsonl".replace("/", "_")
+                    dump_path = str(Path(args.dump_dir) / fname)
                 # 每次运行给一份全新的 EDA/reproduction（避免默认参数共享实例的状态残留）
                 repro = VWH_Local_Reproduction_unevaluate_fixed(eda=VWH(M=15))
                 algorithm = LSEA_BERT(pop_size=args.pop_size, tao=args.tao,
                                       sampling=X0 if X0 is not None else LHS(),
                                       surrogate=surrogate, reproduction=repro,
                                       callback=ObjCallback(), run_seed=seed,
-                                      anchor_cap=args.n_anchor_cap)
+                                      anchor_cap=args.n_anchor_cap,
+                                      dump_path=dump_path,
+                                      dump_meta={"prob": prob_name, "dim": Dim,
+                                                 "seed": seed, "run": r,
+                                                 "run_id": seed * 1000 + r})
 
                 t0 = time.time()
                 res = minimize(problem, algorithm, ("n_evals", args.n_evals),
