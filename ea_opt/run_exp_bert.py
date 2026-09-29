@@ -282,6 +282,11 @@ def main():
     ap.add_argument("--dims", type=int, nargs="+", default=[5, 10, 20])
     ap.add_argument("--runs", type=int, default=10)
     ap.add_argument("--seed-base", type=int, default=0)
+    ap.add_argument("--lhs-seed", type=int, default=None,
+                    help="固定初始 LHS 种群种子：设为整数时，同 (问题,维度) 的所有 run 共享"
+                         "同一初始种群（不同模型/不同 run 均相同），只有繁殖与代理选择的随机性"
+                         "随 run seed 变化——消除初始种群方差的低噪声协议；"
+                         "缺省 None = 旧行为（每个 run 用 run seed 现画 LHS）")
     ap.add_argument("--pop-size", type=int, default=30)
     ap.add_argument("--n-evals", type=int, default=300)
     ap.add_argument("--tao", type=int, default=50,
@@ -340,7 +345,8 @@ def main():
                 done.add(rec["key"])
     print(f"[config] probs={len(probs)} dims={args.dims} runs={args.runs} "
           f"pop={args.pop_size} evals={args.n_evals} tao={args.tao} "
-          f"surrogate={args.surrogate}({surrogate_tag}) out={out_dir}")
+          f"surrogate={args.surrogate}({surrogate_tag}) out={out_dir} "
+          f"lhs_seed={args.lhs_seed if args.lhs_seed is not None else 'per-run'}")
     print(f"[resume] {len(done)} runs already done")
 
     n_anchor_eff = min(args.n_anchor_cap, args.tao) if args.n_anchor_cap else min(args.tao, args.pop_size)
@@ -359,6 +365,13 @@ def main():
     n_done_this_session = 0
     for prob_name in probs:
         for Dim in args.dims:
+            # 固定初始种群协议：同 (问题,维度) 下所有 run（及所有模型）共享同一份 LHS 初始解
+            # （在 lhs seed 下现画一次，直接以矩阵传入 sampling，绕过 minimize 内部的抽样）
+            X0 = None
+            if args.lhs_seed is not None:
+                seed_all(args.lhs_seed)
+                X0 = LHS().do(build_problem(prob_name, Dim),
+                              args.pop_size).get("X")
             for r in range(1, args.runs + 1):
                 seed = args.seed_base + r - 1
                 key = f"{surrogate_tag}/{prob_name}_D{Dim}_r{r}"
@@ -370,6 +383,7 @@ def main():
                 # 每次运行给一份全新的 EDA/reproduction（避免默认参数共享实例的状态残留）
                 repro = VWH_Local_Reproduction_unevaluate_fixed(eda=VWH(M=15))
                 algorithm = LSEA_BERT(pop_size=args.pop_size, tao=args.tao,
+                                      sampling=X0 if X0 is not None else LHS(),
                                       surrogate=surrogate, reproduction=repro,
                                       callback=ObjCallback(), run_seed=seed,
                                       anchor_cap=args.n_anchor_cap)
@@ -404,7 +418,8 @@ def main():
                     "config": {"n_evidence": args.n_evidence, "beta": args.beta,
                                "max_length": args.max_length, "half": args.half,
                                "score": args.score,
-                               "n_anchor_cap": args.n_anchor_cap},
+                               "n_anchor_cap": args.n_anchor_cap,
+                               "lhs_seed": args.lhs_seed},
                 }
 
                 with open(runs_path, "a", encoding="utf-8") as f:
